@@ -1,0 +1,172 @@
+# ===========================================================================
+#  VM-Manager Pro — Docker-Compose-Konfiguration
+# ===========================================================================
+#  Produktname (UI/Anzeige): VM-Manager Pro
+#  Technische Kennungen (Docker erlaubt in Namen keine Leerzeichen und im
+#  Image-Namen keine Großbuchstaben):
+#    Service / Container              : VM-Manager-Pro
+#    Image                          : vm-manager-pro:latest
+#  Unverändert bleiben VP_*-Variablen und die /data-Volumes, damit bestehende
+#  Installationen ohne Datenverlust weiterlaufen. Alte Container
+#  („virtplatform“, „VM-Manager“) werden von den Skripten unter /scripts
+#  automatisch entfernt; bei manuellem Start vorher selbst entfernen:
+#    docker rm -f virtplatform VM-Manager
+# ===========================================================================
+name: vm-manager-pro
+services:
+  VM-Manager-Pro:
+    image: codxio/vm-manager-pro:latest
+    container_name: VM-Manager-Pro
+    restart: always
+
+    # WICHTIG: Docker sendet bei `docker stop` SIGTERM und wartet nur
+    # stop_grace_period (Default 10 s), bevor es SIGKILL schickt. Das reicht
+    # NICHT, damit die Gäste sauber per ACPI/Guest-Agent herunterfahren können.
+    # Daher großzügig über VP_HOST_SHUTDOWN_TIMEOUT (Default 120 s) setzen —
+    # sonst würde Docker den Container (und damit alle VMs) hart killen, bevor
+    # der Host-Shutdown-Ablauf fertig ist.
+    stop_grace_period: "${VP_STOP_GRACE_PERIOD:-150s}"
+    stop_signal: SIGTERM
+
+    # ------------------------------------------------------------------
+    # NETZWERK / BRIDGE-MODUS
+    # ------------------------------------------------------------------
+    # Host-Netzwerk: Der Container teilt sich den Netzwerk-Stack des Hosts.
+    # Nur so sieht libvirt im Container die Host-Bridge (z. B. br0) und kann
+    # VMs direkt daran anschließen (VM bekommt eine LAN-IP vom Router).
+    #
+    # VORAUSSETZUNG (nicht durch die App/Compose automatisierbar): Die Bridge
+    # (z. B. br0 mit der physischen NIC) muss AUF DEM HOST bereits existieren
+    # (netplan / nmcli / bridge-utils) — siehe .env.example.
+    #
+    # FOLGEN von network_mode: host:
+    #  - `ports:` ist wirkungslos (und wird von Docker verworfen) und wurde
+    #    daher entfernt. Die Web-UI lauscht direkt auf dem Host-Port VP_PORT.
+    #  - Der Container hat keine eigene IP mehr; Port-Kollisionen mit anderen
+    #    Host-Diensten sind möglich.
+    network_mode: host
+
+    # ------------------------------------------------------------------
+    # HOST-PID-NAMESPACE (für den Sidebar-Tab „Terminal")
+    # ------------------------------------------------------------------
+    # Die Host-Konsole startet `ttyd` IM HOST-Namespace über `nsenter -t 1`
+    # (Eintritt in die Namespaces von PID 1 = Host-Init). Dafür muss der
+    # Container die PID-Namespaces des Hosts sehen. OHNE `pid: host` ist KEIN
+    # echter Hostzugriff möglich — der Terminal-Tab meldet dann klar
+    # „Kein Zugriff auf den Host-Namespace" statt eine Container-Shell
+    # vorzutäuschen. ttyd lauscht nur auf 127.0.0.1 (kein veröffentlichter
+    # Port); der Zugriff läuft ausschließlich über den authentifizierten
+    # WebSocket-Proxy der Web-UI (Admin-only).
+    pid: host
+
+    # KVM + libvirt brauchen erweiterte Rechte für VMs und Netzwerk.
+    # privileged: true gibt dem Container Zugriff auf ALLE Host-Devices,
+    # inklusive /dev/kvm und /dev/net/tun — ein zusätzliches explizites
+    # `devices:`-Mapping ist damit nicht nötig und verursacht unter
+    # Docker-Desktop/WSL2 sogar Konflikte (das Device wird dann NICHT
+    # durchgereicht). Deshalb hier bewusst KEIN `devices:`-Block.
+    # Die cgroup-Regeln erlauben den Zugriff auf die Major/Minor-Nummern.
+    privileged: true
+    # NET_ADMIN/SYS_ADMIN sind durch `privileged: true` bereits enthalten;
+    # sie werden hier explizit aufgeführt, damit die Anforderung dokumentiert
+    # bleibt und beim späteren Entfernen von `privileged` nicht vergessen wird.
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_TIME            # NTP-Zeitsynchronisation (chrony stellt die Systemuhr)
+    device_cgroup_rules:
+      - 'c 10:232 rwm'      # /dev/kvm (misc major 10, minor 232)
+      - 'c 10:200 rwm'      # /dev/net/tun
+
+    # /lib/modules wird eingehängt (siehe volumes), damit modprobe die
+    # Host-Kernelmodule findet.
+
+    environment:
+      # JWT-Secret. Leer lassen → beim ERSTEN Start wird ein starkes
+      # Zufalls-Secret erzeugt und persistent unter /data/db/secret_key
+      # gespeichert (Tokens bleiben über Neustarts gültig, keine
+      # Neustart-Schleife). Für ein festes Secret in .env VP_SECRET_KEY setzen.
+      VP_SECRET_KEY: "${VP_SECRET_KEY:-}"
+      VP_ADMIN_USER: "${VP_ADMIN_USER:-admin}"
+      # Leer lassen → beim ersten Start wird ein starkes Zufallspasswort erzeugt
+      # und EINMALIG ins Startprotokoll geschrieben (danach ändern). Oder in .env
+      # einen festen Wert setzen. KEIN fest kodiertes „admin".
+      VP_ADMIN_PASSWORD: "${VP_ADMIN_PASSWORD:-}"
+      # Web-UI-Port. Mit network_mode: host gibt es kein Port-Mapping mehr —
+      # die App muss selbst auf diesem Port lauschen (Start-Kommando/Entrypoint
+      # muss VP_PORT auswerten, z. B. uvicorn --port "$VP_PORT").
+      VP_PORT: "${VP_PORT:-8000}"
+      # Name der Host-Bridge, die im VM-Manager als Standard für Netzwerke im
+      # Modus "bridge" vorgeschlagen wird (die Bridge selbst legt der Host an).
+      VP_BRIDGE_NAME: "${VP_BRIDGE_NAME:-br0}"
+      # Persistente Mountpoints (Explorer). Default: Unterordner in /data.
+      VP_MOUNT_WMS: "${VP_MOUNT_WMS:-/data/WMs}"
+      VP_MOUNT_BACKUP: "${VP_MOUNT_BACKUP:-/data/Backup}"
+      VP_MOUNT_ISO: "${VP_MOUNT_ISO:-/data/ISO}"
+      VP_MOUNT_SHARED: "${VP_MOUNT_SHARED:-/data/Shared}"
+      # Kontrolliertes Herunterfahren (Shutdown-Manager)
+      VP_SHUTDOWN_TIMEOUT: "${VP_SHUTDOWN_TIMEOUT:-90}"
+      VP_HOST_SHUTDOWN_TIMEOUT: "${VP_HOST_SHUTDOWN_TIMEOUT:-120}"
+      VP_SHUTDOWN_POLL_INTERVAL: "${VP_SHUTDOWN_POLL_INTERVAL:-2}"
+      VP_USE_GUEST_AGENT: "${VP_USE_GUEST_AGENT:-true}"
+      # Zeitzone fuer die Container-Protokoll-Zeitstempel (leer = Containerzeit)
+      VP_LOG_TZ: "${VP_LOG_TZ:-}"
+      # --- Host-Konsole (Sidebar-Tab „Terminal") ---
+      # AN lassen (Default) für echten Hostzugriff via ttyd+nsenter; mit
+      # "false" wird der Tab serverseitig gesperrt. Der interne ttyd-Port ist
+      # NUR auf 127.0.0.1 gebunden und wird nie veröffentlicht. Startkommando
+      # "login" erzwingt die System-Anmeldung des Hosts (sicherste Variante);
+      # "bash" öffnet direkt eine Shell.
+      VP_HOST_CONSOLE_ENABLED: "${VP_HOST_CONSOLE_ENABLED:-true}"
+      VP_HOST_CONSOLE_PORT: "${VP_HOST_CONSOLE_PORT:-7682}"
+      VP_HOST_CONSOLE_COMMAND: "${VP_HOST_CONSOLE_COMMAND:-login}"
+      # --- Externe VNC-Freigabe (VM-Detail → Tab „VNC-Freigabe") ---
+      # Die Funktion ist verfügbar, aber JEDE VM-Freigabe ist ausgeschaltet,
+      # bis ein Administrator sie in der Oberfläche aktiviert. Zugangsdaten
+      # werden NICHT hier gesetzt, sondern in der Oberfläche (nur als scrypt-Hash
+      # in /data/db). Mit network_mode: host gibt es kein Port-Mapping: der je VM
+      # gewählte Freigabe-Port gilt direkt auf dem Host (KEIN `ports:` nötig);
+      # die Host-Firewall öffnet der Administrator selbst (siehe README).
+      #   VP_VNC_SHARE_ENABLED=false  → Funktion serverseitig komplett gesperrt
+      #   VP_VNC_SHARE_TLS_CERT/_KEY  → Pfade (im Container) zu einem eigenen
+      #                                 Zertifikat/Schlüssel; leer = selbstsigniertes
+      #                                 Zertifikat unter /data/db/vnc (bleibt erhalten)
+      VP_VNC_SHARE_ENABLED: "${VP_VNC_SHARE_ENABLED:-true}"
+      VP_VNC_SHARE_TLS_CERT: "${VP_VNC_SHARE_TLS_CERT:-}"
+      VP_VNC_SHARE_TLS_KEY: "${VP_VNC_SHARE_TLS_KEY:-}"
+      # Anmeldesperre je (IP, VM): nach N Fehlversuchen im Fenster (Sekunden).
+      VP_VNC_SHARE_MAX_FAILURES: "${VP_VNC_SHARE_MAX_FAILURES:-5}"
+      VP_VNC_SHARE_WINDOW_SECONDS: "${VP_VNC_SHARE_WINDOW_SECONDS:-300}"
+      # Gleichzeitige Sitzungen je VM-Freigabe.
+      VP_VNC_SHARE_MAX_SESSIONS: "${VP_VNC_SHARE_MAX_SESSIONS:-4}"
+      # PCIe-Durchreichen (Tab „PCIe-Geräte“): die Boot-Grafik des Hosts (die Karte, mit der der Host selbst
+      # anzeigt) ist standardmäßig GESPERRT. Nur auf true setzen, wenn der Host ohne eigene Anzeige läuft
+      # (headless) bzw. Sie bewusst auf dessen Bildschirmausgabe verzichten.
+      VP_PCI_ALLOW_BOOT_VGA: "${VP_PCI_ALLOW_BOOT_VGA:-false}"
+      # Netzwerkkarten des Hosts entfernen (Seite „Virtuelles Netzwerk“): virtuelle Karten mit Bindestrich im Namen
+      # lassen sich ohne Rückfrage entfernen; der Server prüft vorher, ob sie noch gebraucht werden (VMs, Bridges,
+      # Container, Dienste, aktuelle Verbindung). false = Entfernen komplett abschalten. Wirkt nur mit network_mode: host.
+      VP_NIC_REMOVE_ENABLED: "${VP_NIC_REMOVE_ENABLED:-true}"
+
+    volumes:
+      # - ./vm_data:/data                       # db + alle Mountpoints (persistent)
+      - ./WMs:/data/WMs
+      - ./Backup:/data/Backup
+      - ./ISO:/data/ISO
+      - ./Shared:/data/Shared
+      - /lib/modules:/lib/modules:ro         # host kernel modules for KVM (read-only: der Container lädt Module, schreibt sie aber nie)
+      # USB-Passthrough (Tab „USB“ einer VM): Live-Sicht auf die USB-Gerätedateien des Hosts. Ohne diese Zeile
+      # sieht der Container nur die Geräte, die beim Containerstart schon angeschlossen waren – ein später
+      # eingestecktes Gerät (Hot-Plug) ließe sich nicht durchreichen. Fehlt der Pfad am Host, legt Docker ihn leer an.
+      - /dev/bus/usb:/dev/bus/usb
+      # PCIe-Durchreichen (Tab „PCIe-Geräte“, VFIO): Live-Sicht auf die VFIO-Gerätedateien des Hosts. Beim Zuweisen
+      # bindet libvirt ein Gerät an vfio-pci; erst dann legt der Host-Kernel /dev/vfio/<Gruppe> an. Ohne diese Zeile
+      # sieht der Container diese Dateien nicht und der VM-Start scheitert. Voraussetzungen am HOST: IOMMU im BIOS
+      # (VT-d / AMD-Vi) und Kernel-Parameter (intel_iommu=on bzw. amd_iommu=on), Modul vfio-pci (siehe README).
+      # Fehlt der Pfad am Host, legt Docker ihn leer an – das ist unschädlich.
+      - /dev/vfio:/dev/vfio
+      # Für eigene Speicherorte je Mountpoint eigene Volumes einhängen, z. B.:
+
+#volumes:
+  #vm_data:
+    #driver: local
