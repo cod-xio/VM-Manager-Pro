@@ -178,7 +178,40 @@ Weitere Variablen – einschließlich kontrolliertem Herunterfahren, PCIe-Passth
 
 ## Lizenz
 
-Ergänze hier die Lizenz des Projekts und stelle sicher, dass du zur Veröffentlichung des Quellcodes, der Screenshots und aller enthaltenen Bestandteile berechtigt bist.
+Lizenz
+LICENSE.md
+Lizenz – VM-Manager Pro
+
+VM-Manager Pro ist eine selbst-gehostete Virtualisierungs-Plattform (libvirt/KVM) und wird unter der MIT-Lizenz bereitgestellt.
+MIT License
+
+Copyright (c) 2026 XIO
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+Hinweise
+
+Diese Software wird „wie besehen" (as-is) für den Eigenbetrieb (Self-Hosting) bereitgestellt. Bitte die Sicherheitshinweise in der README.md beachten, bevor die Anwendung in einem nicht vertrauenswürdigen Netzwerk exponiert wird.
+Drittanbieter-Komponenten
+
+Die Anwendung nutzt bzw. bündelt quelloffene Komponenten, die unter ihren jeweils eigenen Lizenzen stehen. Diese Lizenzen gelten unverändert fort:
+
+    ttyd – MIT License (statisch gelinkte Release-Binary für die Host-Konsole).
+    noVNC (@novnc/novnc) – Mozilla Public License 2.0 (VNC-Konsole im Browser).
+    xterm.js (@xterm/xterm, @xterm/addon-fit) – MIT License (Terminal-UI).
+    FastAPI, Uvicorn, SQLModel, Pydantic – MIT License.
+    React, Vite, Tailwind CSS – MIT License.
+    libvirt-python – LGPL-2.1-or-later.
+    python-jose, bcrypt, websockets, psutil, cryptography – jeweils
+
+BSD-/MIT-/Apache-2.0-artige Lizenzen der jeweiligen Projekte.
+
+Das Konzept der Host-Konsole ist von ttydBridge (AGPL-3.0) inspiriert; die Umsetzung in diesem Projekt ist eigenständiger Code und übernimmt keinen AGPL-lizenzierten Quellcode. ttyd selbst steht unter der MIT-Lizenz.
+
+Marken- und Produktnamen (z. B. VMware, VMware Workstation) sind Eigentum der jeweiligen Inhaber und werden ausschließlich zu Kompatibilitäts- und Beschreibungszwecken genannt.
 
 ---
 
