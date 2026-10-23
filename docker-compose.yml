@@ -15,7 +15,7 @@
 name: vm-manager-pro
 services:
   VM-Manager-Pro:
-    image: codxio/vm-manager-pro:latest
+    image: codxio/vm-manager-pro:1.0.0
     container_name: VM-Manager-Pro
     restart: always
 
