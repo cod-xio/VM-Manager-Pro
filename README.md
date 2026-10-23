@@ -4,7 +4,7 @@
 
 VM-Manager Pro bietet eine zentrale Oberfläche zum Verwalten von KVM/QEMU-VMs, virtueller Hardware, Netzwerken, Speicher, ISO-Dateien und Backups.
 
-> **Hinweis:** Dieses Repository enthält die README, Screenshots und die bereitgestellte Docker-Compose-Konfiguration. Das eigentliche Container-Image `codxio/vm-manager-pro:latest` muss separat gebaut oder aus einer von dir veröffentlichten Registry bezogen werden. Die Compose-Datei lädt das Image nicht automatisch aus GitHub.
+> **Hinweis:** Dieses Repository enthält die README, Screenshots und die bereitgestellte Docker-Compose-Konfiguration. Das eigentliche Container-Image `codxio/vm-manager-pro:1.0.0` muss separat gebaut oder aus einer von dir veröffentlichten Registry bezogen werden. Die Compose-Datei lädt das Image nicht automatisch aus GitHub.
 
 ## Übersicht
 
@@ -76,7 +76,7 @@ mkdir -p WMs Backup ISO Shared
 
 ### 3. Image bereitstellen
 
-Stelle sicher, dass das Image `codxio/vm-manager-pro:latest` lokal verfügbar ist. Falls du es selbst baust, verwende den Build-Prozess des zugehörigen Quellprojekts.
+Stelle sicher, dass das Image `codxio/vm-manager-pro:1.0.0` lokal verfügbar ist. Falls du es selbst baust, verwende den Build-Prozess des zugehörigen Quellprojekts.
 
 ### 4. Host-Bridge prüfen
 
